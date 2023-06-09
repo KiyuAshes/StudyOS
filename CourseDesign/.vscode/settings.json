@@ -1,0 +1,34 @@
+{
+    // C++语言配置
+    "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    },
+    // C++语言服务器
+    "clangd.arguments": [
+        "--header-insertion=never"
+    ],
+    "clangd.fallbackFlags": [
+        "-I${workspaceFolder}/include"
+    ],
+    // 文件头部注释
+    "fileheader.customMade": {
+        "Author": "KiyuAshes",
+        "Date": "Do not edit",
+        "LastEditTime": "Do not edit",
+        "Description": "",
+        "E-mail": "kiyuashes@stu.usc.edu.cn",
+        "custom_string_obkoro1": "Copyright (c) ${now_year} by KiyuAshes, All Rights Reserved. "
+    },
+    "fileheader.configObj": {
+        "autoAdd": false,
+    },
+    // 单文件运行
+    "code-runner.executorMap": {
+        "c": "gcc $fileName -o debug.exe; ./debug.exe; rm -f ./debug.exe",
+        "cpp": "g++ $fileName -o debug.exe; ./debug.exe; rm -f ./debug.exe"
+    },
+    // CMake配置
+    "cmake.debugConfig": {
+        "miDebuggerArgs": "-q -ex quit; wait() { fg >/dev/null; }; /bin/gdb -q --interpreter=mi"
+    },
+}
