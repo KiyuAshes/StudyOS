@@ -1,12 +1,13 @@
 /*
  * @Author: KiyuAshes
  * @Date: 2023-05-16 20:47:26
- * @LastEditTime: 2023-06-09 02:37:03
+ * @LastEditTime: 2023-06-09 07:26:31
  * @Description:
  * @E-mail: kiyuashes@stu.usc.edu.cn
  * Copyright (c) 2023 by KiyuAshes, All Rights Reserved.
  */
 
+#include <bits/stdint-uintn.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -93,16 +94,22 @@ int main() {
     u_ix_cur = 1;
 
     // 5.交互循环
-    char* f_buf;           // 文件缓冲区
-    uint64_t offset;       // 文件偏移
-    char f_name_buf[256];  // 文件名缓冲区
+    DirEntry de_cur;  //目录项
+    DirEntry de_buf;  //目录项缓冲区
 
+    char f_str[30];      // 格式化字符串
+    char str_buf[30];    // 字符串缓冲区
     char commond[10];    // 命令缓冲区
     char path_cur[512];  // 当前路径
     char path_buf[512];  // 路径缓冲区
 
-    DirEntry de_cur;  //目录项
-    DirEntry de_buf;  //目录项缓冲区
+    char* f_buf;           // 文件缓冲区
+    uint64_t offset;       // 文件偏移
+    char f_name_buf[256];  // 文件名缓冲区
+
+    uint8_t flag_fin;          // 命令完成标志
+    uint8_t flag_file_opened;  // 文件打开标志
+
     /*
      * 命令列表
      * 退出软件: exit
@@ -118,6 +125,7 @@ int main() {
      */
 
     strcpy(path_cur, "/");
+    flag_file_opened = 0;
 
     while (1) {
         // 命令提示符
@@ -133,12 +141,30 @@ int main() {
 
         // 命令判断
         if (strcmp(commond, "exit") == 0) {
+            if (flag_file_opened) {
+                printf("当前有未关闭的文件,请关闭后重试!\n");
+                goto finish;
+            }
+
             break;
         }
-        else if (strcmp(commond, "su") == 0) {
+        else if (flag_file_opened) {
+        }
+
+        if (strcmp(commond, "su") == 0) {
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
+
             switch_user(ulist, ulist_len, &uid_cur, &u_ix_cur);
         }
         else if (strcmp(commond, "ls") == 0) {
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
+
             uint16_t i;
 
             f_buf = malloc(inode_dir_cur.i_size * sizeof(char));
@@ -212,8 +238,12 @@ int main() {
             free(f_buf);
         }
         else if (strcmp(commond, "cd") == 0) {
-            uint32_t ps, pe;   // 路径处理指针
-            uint8_t flag_fin;  // 命令完成指针
+            uint32_t ps, pe;  // 路径处理指针
+
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
 
             if (!try_read_newline()) {
                 scanf("%s", path_buf);
@@ -295,13 +325,13 @@ int main() {
                     if (offset >= inode_dir_cur.i_size) {
                         printf("路径不存在!\n");
                         flag_fin = 1;
-                        break;
+                        continue;
                     }
 
                     if (de_cur.file_type != FT_DIR) {
                         printf("该路径不是文件夹!\n");
                         flag_fin = 1;
-                        break;
+                        continue;
                     }
 
                     // 更新当前路径和Inode记录
@@ -326,6 +356,11 @@ int main() {
             }
         }
         else if (strcmp(commond, "touch") == 0) {
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
+
             if (!try_read_newline()) {
                 scanf("%s", f_name_buf);
 
@@ -338,7 +373,7 @@ int main() {
 
                 de_buf.inode = get_free_inode(vd, &super_blk, gdt);
                 de_buf.rec_len = 8 + strlen(f_name_buf) + 1 + (4 - ((strlen(f_name_buf) + 1) % 4));
-                de_buf.name_len = strlen(f_name_buf) + 1;
+                de_buf.name_len = strlen(f_name_buf);
                 de_buf.file_type = FT_FILE;
                 strcpy(de_buf.name, f_name_buf);
 
@@ -348,6 +383,8 @@ int main() {
                 f_buf = malloc(inode_dir_cur.i_size * sizeof(char));
 
                 read_file(vd, &inode_dir_cur, f_buf, inode_dir_cur.i_size);  // 读取目录文件
+
+                offset = 0;
 
                 while (offset < inode_dir_cur.i_size) {
                     de_cur = *(DirEntry*)(f_buf + offset);
@@ -361,6 +398,8 @@ int main() {
                         memcpy(f_buf + offset + de_cur.rec_len, &de_buf, de_buf.rec_len);
 
                         write_file(vd, &inode_dir_cur, f_buf, inode_dir_cur.i_size);
+
+                        printf("文件创建成功!\n");
 
                         break;
                     }
@@ -373,6 +412,11 @@ int main() {
             }
         }
         else if (strcmp(commond, "rm") == 0) {
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
+
             if (!try_read_newline()) {
                 scanf("%s", f_name_buf);
 
@@ -381,18 +425,80 @@ int main() {
 
                 read_file(vd, &inode_dir_cur, f_buf, inode_dir_cur.i_size);  // 读取目录文件
 
+                offset = 0;
+                flag_fin = 0;
+
                 while (offset < inode_dir_cur.i_size) {
                     de_cur = *(DirEntry*)(f_buf + offset);
 
-                    if ((de_cur.rec_len - 8 - de_cur.name_len - 1) > de_buf.rec_len) {
-                        de_buf.rec_len = de_cur.rec_len - 8 - de_cur.name_len - 1 - (4 - ((de_cur.name_len) % 4));
+                    if (no_end_strcmp(de_cur.name, f_name_buf, de_cur.name_len, strlen(f_name_buf))) {
+                        flag_fin = 1;
 
-                        de_cur.rec_len = 8 + de_cur.name_len + 1 + (4 - ((de_cur.name_len) % 4));
+                        if (de_cur.file_type == FT_DIR) {
+                            printf("不能删除目录\n");
+                            break;
+                        }
 
-                        memcpy(f_buf + offset, &de_cur, de_cur.rec_len);
-                        memcpy(f_buf + offset + de_cur.rec_len, &de_buf, de_buf.rec_len);
+                        de_buf.rec_len += de_cur.rec_len;
+
+                        memcpy(f_buf + offset - de_buf.rec_len + de_cur.rec_len, &de_buf, de_buf.rec_len - de_cur.rec_len);
 
                         write_file(vd, &inode_dir_cur, f_buf, inode_dir_cur.i_size);
+
+                        release_inode(vd, &super_blk, gdt, de_cur.inode);
+
+                        printf("删除成功!\n");
+
+                        break;
+                    }
+
+                    // 指向下一个目录条目, 并保存当前条目
+                    de_buf = de_cur;
+                    offset += de_cur.rec_len;
+                }
+
+                if (!flag_fin) {
+                    printf("文件不存在!\n");
+                }
+
+                free(f_buf);
+            }
+        }
+        else if (strcmp(commond, "open") == 0) {
+            if (flag_file_opened) {
+                printf("当前有文件已打开!\n");
+                goto finish;
+            }
+
+            if (!try_read_newline()) {
+                flag_file_opened = 1;
+
+                scanf("%s", f_name_buf);
+
+                // 目录操作
+                f_buf = malloc(inode_dir_cur.i_size * sizeof(char));
+
+                read_file(vd, &inode_dir_cur, f_buf, inode_dir_cur.i_size);  // 读取目录文件
+
+                offset = 0;
+                flag_fin = 0;
+
+                while (offset < inode_dir_cur.i_size) {
+                    de_cur = *(DirEntry*)(f_buf + offset);
+
+                    if (no_end_strcmp(de_cur.name, f_name_buf, de_cur.name_len, strlen(f_name_buf))) {
+                        flag_fin = 1;
+
+                        if (de_cur.file_type == FT_DIR) {
+                            printf("不能打开目录\n");
+                            break;
+                        }
+
+                        get_inode(vd, &super_blk, gdt, de_cur.inode, &inode_f_cur);
+
+                        read_file(vd, &inode_f_cur, f_buf, inode_f_cur.i_size);
+
+                        printf("文件打开成功\n");
 
                         break;
                     }
@@ -401,21 +507,53 @@ int main() {
                     offset += de_cur.rec_len;
                 }
 
-                free(f_buf);
+                if (!flag_fin) {
+                    printf("文件不存在!\n");
+                }
             }
         }
-        else if (strcmp(commond, "open") == 0) {
-        }
         else if (strcmp(commond, "close") == 0) {
+            if (!flag_file_opened) {
+                printf("当前未打开文件!\n");
+                goto finish;
+            }
+
+            write_file(vd, &inode_f_cur, f_buf, inode_f_cur.i_size);
+            flag_file_opened = 0;
+
+            free(f_buf);
         }
         else if (strcmp(commond, "read") == 0) {
+            if (!flag_file_opened) {
+                printf("当前未打开文件!\n");
+                goto finish;
+            }
+
+            for (offset = 0; offset < inode_f_cur.i_size; offset++) {
+                printf("%c", f_buf[offset]);
+            }
+
+            printf("\n");
         }
         else if (strcmp(commond, "write") == 0) {
+            if (!flag_file_opened) {
+                printf("当前未打开文件!\n");
+                goto finish;
+            }
+
+            sprintf(f_str, "%%%ds", inode_f_cur.i_size);
+
+            scanf(f_str, f_buf);
+
+            scanf("%*[^\n]");
+
+            printf("已暂存,关闭后写入镜像\n");
         }
         else {
             printf("未知命令,请重新输入!\n");
         }
 
+    finish:
         // 清除换行
         getchar();
     }

@@ -16,10 +16,10 @@ void get_inode(FILE* vdisk, const SuperBlock* super_blk, const GroupDesc* gdt, u
     uint32_t blk_g_inode_ix = (inode_ix - 1) % super_blk->inodes_per_group;
 
     // 计算Inode节点在哪个块上
-    uint32_t blk_ix = gdt[blk_g_ix].bg_inode_table + (blk_g_inode_ix * DEFAULT_INODE_SIZE - 1) / DEFAULT_BLK_SIZE;
+    uint32_t blk_ix = gdt[blk_g_ix].bg_inode_table + (blk_g_inode_ix * DEFAULT_INODE_SIZE) / DEFAULT_BLK_SIZE;
 
     // 计算Inode节点在该块中的序号
-    uint32_t blk_inode_ix = blk_g_inode_ix % (DEFAULT_BLK_SIZE / DEFAULT_INODE_SIZE);
+    uint32_t blk_inode_ix = (blk_g_inode_ix) % (DEFAULT_BLK_SIZE / DEFAULT_INODE_SIZE);
 
     read_block(vdisk, blk_buf, DEFAULT_BLK_SIZE, blk_ix);
 
