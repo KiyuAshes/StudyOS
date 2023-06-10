@@ -34,7 +34,7 @@ void creat_user(User* ulist, uint16_t* ulist_len, uint16_t uid, char* uname, cha
 }
 
 // 切换用户
-void switch_user(const User* ulist, uint16_t ulist_len, uint16_t* uid_cur, uint16_t* u_ix_curd) {
+void switch_user(const User* ulist, uint16_t ulist_len, uint16_t* uid_cur, uint16_t* u_ix_cur) {
     uint16_t ix;
     uint16_t uid;
     char uname[20];
@@ -65,6 +65,6 @@ void switch_user(const User* ulist, uint16_t ulist_len, uint16_t* uid_cur, uint1
 
     if (strcmp(passwd, ulist[ix].passwd) == 0) {
         *uid_cur = uid;
-        *u_ix_curd = ix;
+        *u_ix_cur = ix;
     }
 }
